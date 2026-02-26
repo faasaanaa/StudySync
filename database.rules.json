@@ -1,0 +1,46 @@
+{
+  "rules": {
+    "messages": {
+      "$chatId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "$messageId": {
+          ".validate": "newData.hasChildren(['senderId', 'text', 'timestamp', 'type'])"
+        }
+      }
+    },
+    "typing": {
+      "$chatId": {
+        "$uid": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid === $uid"
+        }
+      }
+    },
+    "presence": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "rooms": {
+      "$sessionId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "timer": {
+          ".validate": "newData.hasChildren(['running', 'timeLeft', 'phase'])"
+        },
+        "todos": {
+          "$todoId": {
+            ".validate": "newData.hasChildren(['text', 'completed', 'createdBy'])"
+          }
+        },
+        "chat": {
+          "$messageId": {
+            ".validate": "newData.hasChildren(['senderId', 'text', 'timestamp'])"
+          }
+        }
+      }
+    }
+  }
+}
