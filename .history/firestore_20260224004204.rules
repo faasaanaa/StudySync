@@ -1,0 +1,105 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper: Check if user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+    
+    // Helper: Check if user is the document owner
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+    
+    // Users collection
+    match /users/{uid} {
+      // Anyone can read user profiles (for browse/matching/leaderboard)
+      allow read: if true;
+      
+      // Users can create their own profile
+      allow create: if isOwner(uid);
+      
+      // Users can update their own profile.
+      // Also allow authenticated users to update specific session-related
+      // fields (totalSessions, streak, lastSessionDate, rating, totalRatings)
+      // so that client-side session confirmation and review recalculation work.
+      allow update: if isOwner(uid) || (
+        isAuth() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['totalSessions', 'streak', 'lastSessionDate', 'rating', 'totalRatings'])
+      );
+      
+      allow delete: if isOwner(uid);
+    }
+    
+    // Sessions collection
+    match /sessions/{sessionId} {
+      // Only participants can read sessions
+      allow read: if isAuth() && (
+        resource.data.tutorId == request.auth.uid || 
+        resource.data.learnerId == request.auth.uid
+      );
+      
+      // Authenticated users can create sessions
+      allow create: if isAuth() && (
+        request.resource.data.tutorId == request.auth.uid || 
+        request.resource.data.learnerId == request.auth.uid
+      );
+      
+      // Only participants can update sessions
+      allow update: if isAuth() && (
+        resource.data.tutorId == request.auth.uid || 
+        resource.data.learnerId == request.auth.uid
+      );
+      
+      allow delete: if false;
+    }
+    
+    // Conversations collection
+    match /conversations/{chatId} {
+      // Only participants can read/write
+      allow read, write: if isAuth() && 
+        request.auth.uid in resource.data.participants;
+      allow create: if isAuth();
+    }
+    
+    // Reviews collection
+    match /reviews/{reviewId} {
+      // Anyone can read reviews
+      allow read: if true;
+      
+      // Authenticated users can create reviews
+      // They must be the reviewer
+      allow create: if isAuth() && 
+        request.resource.data.reviewerId == request.auth.uid;
+      
+      // Reviews cannot be updated or deleted once submitted
+      allow update, delete: if false;
+    }
+    
+    // Bookmarks collection
+    match /bookmarks/{uid} {
+      allow read, write: if isOwner(uid);
+      
+      match /saved/{targetUid} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+    
+    // Proposals collection
+    match /proposals/{proposalId} {
+      allow read: if isAuth() && (
+        resource.data.fromId == request.auth.uid || 
+        resource.data.toId == request.auth.uid
+      );
+      allow create: if isAuth() && 
+        request.resource.data.fromId == request.auth.uid;
+      allow update: if isAuth() && (
+        resource.data.fromId == request.auth.uid || 
+        resource.data.toId == request.auth.uid
+      );
+    }
+  }
+}
